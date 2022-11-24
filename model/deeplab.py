@@ -134,7 +134,7 @@ class Classifier_Module(nn.Module):
         super(Classifier_Module, self).__init__()
         self.conv2d_list = nn.ModuleList()
         for dilation, padding in zip(dilation_series, padding_series):
-            self.conv2d_list.append(nn.Conv2d(64, num_classes, kernel_size=3, stride=1, padding=padding, dilation=dilation, bias = True))
+            self.conv2d_list.append(nn.Conv2d(2048, num_classes, kernel_size=3, stride=1, padding=padding, dilation=dilation, bias = True))
 
         for m in self.conv2d_list:
             m.weight.data.normal_(0, 0.01)
@@ -244,6 +244,9 @@ class ResNet(nn.Module):
 
         # currently trying to find the right input for decoder. Code works till here
         x5 = self.layer5(dec_feature)
+
+        # To work the original scops code, use below line
+        # x5 = self.layer5(x4)
 
         return None, feature, x5
 
