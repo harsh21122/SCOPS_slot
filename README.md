@@ -20,4 +20,5 @@ Dataset - https://drive.google.com/file/d/1KmaqKL5-qjNIFM4UqwytRYkRQLLlZljN/view
 * To be consistent to SCOPS paper, we have to figure out an ouput in form of (batch, num_parts+1, h, w). num_channels here is num_parts+1.
 * Each channel is supposedly predicting a part, while in SLOT paper they were trying to reconstruct the original image with decoder.
 
- 
+## Note:
+* Can try to predict each slot as a part map. 
