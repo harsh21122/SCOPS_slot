@@ -22,3 +22,10 @@ Dataset - https://drive.google.com/file/d/1KmaqKL5-qjNIFM4UqwytRYkRQLLlZljN/view
 
 ## Note:
 * Can try to predict each slot as a part map. 
+
+
+## MODIFICATIONS
+- I have create some changes in the new branch concentration_loss. I changed everything to get output of [batch_size * num_slots, Channel, h, w] from the last output.
+- I had some problems with semantic consistency loss, so I tried to use concentration_loss.
+- Every tensor and model is on CPU currently. If you want to run this code and see the output you can.
+- I have no definite ideas as of yet for handling slots and combining them.
