@@ -38,7 +38,7 @@ MODEL = 'DeepLab'
 BATCH_SIZE = 10
 NUM_WORKERS = 4
 DATASET = 'PASCAL'
-DATA_DIRECTORY = '/home/harsh21122/tmp/PASCAL 2010'
+DATA_DIRECTORY = 'data/PASCAL_2010'
 PASCAL_CLASS = 'horse'
 DATA_LIST_PATH = ''
 INPUT_SIZE = '128,128'
@@ -235,7 +235,7 @@ def main():
 
     # create network
     model = model_generator(args)
-    print(model)
+    # print(model)
     model.train()
 
     # model.cuda(args.gpu)
@@ -260,10 +260,10 @@ def main():
         shuffle=True,
         drop_last=True)
     trainloader_iter = enumerate(trainloader)
-    print(trainloader_iter)
+    # print(trainloader_iter)
 
     
-    for i_iter in range(1):
+    for i_iter in range(args.num_steps):
 
         try:
             _, batch = trainloader_iter.__next__()
@@ -271,7 +271,7 @@ def main():
             trainloader_iter = enumerate(trainloader)
             _, batch = trainloader_iter.__next__()
         
-        print(batch['img'].shape)
+        # print(batch['img'].shape)
         
         trainer.step(batch, i_iter)
         exit(0)

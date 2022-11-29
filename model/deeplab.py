@@ -33,6 +33,7 @@ import torch.utils.model_zoo as model_zoo
 import torch
 import numpy as np
 import torch.nn.functional as F
+from einops import rearrange
 affine_par = True
 
 
@@ -135,12 +136,12 @@ class Classifier_Module(nn.Module):
         self.conv2d_list = nn.ModuleList()
         for dilation, padding in zip(dilation_series, padding_series):
             self.conv2d_list.append(nn.Conv2d(2048, num_classes, kernel_size=3, stride=1, padding=padding, dilation=dilation, bias = True))
-
         for m in self.conv2d_list:
             m.weight.data.normal_(0, 0.01)
 
     def forward(self, x):
         out = self.conv2d_list[0](x)
+        # print(f"Out shape: {out.shape}")
         for i in range(len(self.conv2d_list)-1):
             out += self.conv2d_list[i+1](x)
         return out
@@ -175,6 +176,8 @@ class ResNet(nn.Module):
                 m.bias.data.zero_()
 
         self.enc_fc = nn.Linear(2048, hid_dim)
+        self.enc_fc_slot = nn.Linear(hid_dim, 2048)
+        self.conv1x1 = nn.Conv2d(64, 2048, kernel_size= 1)
         self.relu = nn.ReLU()
         self.encoder_pos = SoftPositionEmbed(2048, resolution)
         self.decoder_pos = SoftPositionEmbed(hid_dim, (8, 8))
@@ -217,28 +220,35 @@ class ResNet(nn.Module):
         x4 = self.layer4(x)
         feature = x
 
-        print("x4 features : ", x4.shape)
+        # print("x4 features : ", x4.shape)
         
         enc_feature = x4.permute(0,2,3,1)
-        print("enc_feature before positional: ", enc_feature.shape)
+        # print("enc_feature before positional: ", enc_feature.shape)
         enc_feature = self.encoder_pos(enc_feature)
-        print("enc_feature after positional encoding: ", enc_feature.shape)
+        # print("enc_feature after positional encoding: ", enc_feature.shape)
         enc_feature = torch.flatten(enc_feature, 1, 2)
-        print("flatten enc_feature : ", enc_feature.shape)
+        # print("flatten enc_feature : ", enc_feature.shape)
         enc_feature = self.relu(self.enc_fc(enc_feature))
-        print("enc_feature after enc_fc linear layer: ", enc_feature.shape)
+        # print("enc_feature after enc_fc linear layer: ", enc_feature.shape)
         
         slots = self.slot_attention(enc_feature)
-        print("Size of slots : ", slots.shape)
-        slots = slots.reshape((-1, slots.shape[-1])).unsqueeze(1).unsqueeze(2)
-        print("Size of slots after reshaping: ", slots.shape)
-        slots = slots.repeat((1, 8, 8, 1))
-        print("Size of slots after broadcasting: ", slots.shape)
+        # print("Size of slots : ", slots.shape)
+        # slots = self.relu(self.enc_fc_slot(slots))
+        # slots = slots.reshape((-1, slots.shape[-1])).unsqueeze(1).unsqueeze(2)
+        slots = rearrange(slots, 'b s c -> b s 1 1 c')
+        # print("Size of slots after reshaping: ", slots.shape)
+        slots = slots.repeat((1, 1, 8, 8, 1))
+        # slots = slots.repeat((1, 29, 29, 1))
+        # print("Size of slots after broadcasting: ", slots.shape)
     
         dec_feature = self.decoder_pos(slots)
-        print("dec_feature after positional encoding: ", dec_feature.shape)
-        dec_feature = dec_feature.permute(0,3,1,2)
-        print("dec_feature after permute: ", dec_feature.shape)
+        # print("dec_feature after positional encoding: ", dec_feature.shape)
+        # dec_feature = dec_feature.permute(0, 1,4,2,3)
+        dec_feature = rearrange(dec_feature, ' b s h w c -> (b s) c h w')
+        # print("dec_feature after permute: ", dec_feature.shape)
+
+        ## apply 1x1 convolution to increase the number of channels 
+        dec_feature = self.conv1x1(dec_feature)
 
 
 
@@ -373,7 +383,8 @@ def build_grid(resolution):
     grid = np.reshape(grid, [resolution[0], resolution[1], -1])
     grid = np.expand_dims(grid, axis=0)
     grid = grid.astype(np.float32)
-    return torch.from_numpy(np.concatenate([grid, 1.0 - grid], axis=-1)).to(device)
+    # return torch.from_numpy(np.concatenate([grid, 1.0 - grid], axis=-1)).to(device)
+    return torch.from_numpy(np.concatenate([grid, 1.0 - grid], axis=-1))
 
 """Adds soft positional embedding with learnable projection."""
 class SoftPositionEmbed(nn.Module):
@@ -389,4 +400,11 @@ class SoftPositionEmbed(nn.Module):
 
     def forward(self, inputs):
         grid = self.embedding(self.grid)
+        # print(f"######################")
+        # print(f"Grid shape: {grid.shape}")
+        # print(f"Input shape: {inputs.shape}")
+        # print(f"######################")
+        if len(inputs.size()) == 5:
+            # print(f"Unsquezed grid")
+            return inputs + grid.unsqueeze(0)
         return inputs + grid

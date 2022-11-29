@@ -16,6 +16,7 @@ def get_variance(part_map, x_c, y_c):
 
     h,w = part_map.shape
     x_map, y_map = utils.get_coordinate_tensors(h,w)
+    x_map, y_map = x_map.to('cpu'), y_map.to('cpu')
 
     v_x_map = (x_map - x_c) * (x_map - x_c)
     v_y_map = (y_map - y_c) * (y_map - y_c)

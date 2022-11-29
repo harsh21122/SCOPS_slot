@@ -20,6 +20,9 @@ def get_center(part_map, self_referenced=False):
     h,w = part_map.shape
     x_map, y_map = get_coordinate_tensors(h,w)
 
+    x_map, y_map = x_map.to('cpu'), y_map.to('cpu')
+    part_map = part_map.to('cpu')
+    # print(part_map.get_device())
     x_center = (part_map * x_map).sum()
     y_center = (part_map * y_map).sum()
 

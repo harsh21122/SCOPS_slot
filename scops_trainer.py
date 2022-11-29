@@ -127,9 +127,9 @@ class SCOPSTrainer(object):
         feature_instance, feature_part, pred_low = self.model(images_cpu)
         pred = self.interp(pred_low)
         # print("feature_instance : ", feature_instance.shape)
-        print("feature_part : ", feature_part.shape)
-        print("pred_low : ", pred_low.shape)
-        print("pred : ", pred.shape)
+        # print("feature_part : ", feature_part.shape)
+        # print("pred_low : ", pred_low.shape)
+        # print("pred : ", pred.shape)
         # prepare for torch model_zoo models images
 
 
@@ -142,17 +142,18 @@ class SCOPSTrainer(object):
 
         images_zoo_cpu = torch.from_numpy(images_zoo_cpu)
         # images_zoo = images_zoo_cpu.cuda(self.args.gpu)
-        print("images_zoo_cpu : ", images_zoo_cpu.shape)
+        # print("images_zoo_cpu : ", images_zoo_cpu.shape)
         with torch.no_grad():
 
             zoo_feats = self.zoo_feat_net(images_zoo_cpu)
-            print("zoo_feats : ", len(zoo_feats))
+            # print("zoo_feats : ", len(zoo_feats))
             for i in range(len(zoo_feats)):
-                print("i, zoo_feats[i].shape : ", i, zoo_feats[i].shape)
+                # print("i, zoo_feats[i].shape : ", i, zoo_feats[i].shape)
+                pass
             zoo_feat = torch.cat([self.interp(zoo_feat)
                                   for zoo_feat in zoo_feats], dim=1)
             # saliency masking
-            print("zoo_feat : ", zoo_feat.shape)
+            # print("zoo_feat : ", zoo_feat.shape)
 
 
 
@@ -164,10 +165,10 @@ class SCOPSTrainer(object):
 
        
 
-        loss_sc = loss.semantic_consistency_loss(
-            features=zoo_feat, pred=pred, basis=self.part_basis_generator())
-        loss_sc_value += self.args.lambda_sc * loss_sc.data.cpu().numpy()
-        print("loss_sc_value : ", loss_sc_value)
+        # loss_sc = loss.semantic_consistency_loss(
+        #     features=zoo_feat, pred=pred, basis=self.part_basis_generator())
+        # loss_sc_value += self.args.lambda_sc * loss_sc.data.cpu().numpy()
+        # print("loss_sc_value : ", loss_sc_value)
 
         # # orthonomal_loss
         # loss_orthonamal = loss.orthonomal_loss(self.part_basis_generator())
@@ -175,8 +176,8 @@ class SCOPSTrainer(object):
         #     loss_orthonamal.data.cpu().numpy()
 
         # # Concentratin Loss
-        # loss_con = loss.concentration_loss(pred)
-        # loss_con_value += self.args.lambda_con * loss_con.data.cpu().numpy()
+        loss_con = loss.concentration_loss(pred)
+        loss_con_value += self.args.lambda_con * loss_con.data.cpu().numpy()
 
         # # Equivariance Loss
         # images_cj = torch.from_numpy(
@@ -242,7 +243,7 @@ class SCOPSTrainer(object):
         #     + self.args.lambda_sc * loss_sc \
         #     + self.args.lambda_orthonormal * loss_orthonamal
 
-        total_loss = self.args.lambda_sc * loss_sc
+        total_loss = self.args.lambda_con * loss_con
 
         total_loss.backward()
 
