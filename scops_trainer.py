@@ -14,10 +14,13 @@ from utils import utils
 from model.feature_extraction import FeatureExtraction, featureL2Norm
 from torchvision import transforms
 # from tps.rand_tps import RandTPS
-# from visualize import Visualizer
+from visualizer import Visualizer
+import wandb
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 IMG_MEAN = np.array((104.00698793, 116.66876762,
                      122.67891434), dtype=np.float32)
+
 
 
 class PartBasisGenerator(nn.Module):
@@ -82,7 +85,7 @@ class SCOPSTrainer(object):
         self.zoo_feat_net.eval()
 
         self.part_basis_generator = PartBasisGenerator(self.zoo_feat_net.out_dim,
-                                                       args.num_parts, normalize=args.ref_norm)
+                                                       args.num_parts, normalize=args.ref_norm).to(device)
         # self.part_basis_generator.cuda(args.gpu)
         self.part_basis_generator.train()
 
@@ -100,7 +103,8 @@ class SCOPSTrainer(object):
         self.optimizer_sc.zero_grad()
 
         # visualizor
-        # self.viz = Visualizer(args)
+        self.viz = Visualizer(args)
+        
 
     def step(self, batch, current_step):
         loss_con_value = 0
@@ -113,7 +117,7 @@ class SCOPSTrainer(object):
         self.optimizer_sc.zero_grad()
         adjust_learning_rate(self.optimizer_seg, current_step, self.args)
 
-        images_cpu = batch['img']
+        images_cpu = batch['img'].to(device)
         labels = batch['saliency'] if 'saliency' in batch.keys() else None
         edges = batch['edge'] if 'edge' in batch.keys() else None
         gts = batch['gt'] if 'gt' in batch.keys() else None
@@ -123,13 +127,17 @@ class SCOPSTrainer(object):
 
 
         # print("images_cpu, labels, edges,  gts, landmarks, bbox : ", images_cpu, labels, edges,  gts, landmarks, bbox)
-        # images = images_cpu.cuda(self.args.gpu)
+        # images_cpu = images_cpu.cuda(self.args.gpu)
+        # print("np.unique(images_cpu.detach().cpu().numpy()) : ", np.unique(images_cpu.detach().cpu().numpy()))
         feature_instance, feature_part, pred_low = self.model(images_cpu)
         pred = self.interp(pred_low)
         # print("feature_instance : ", feature_instance.shape)
         print("feature_part : ", feature_part.shape)
         print("pred_low : ", pred_low.shape)
         print("pred : ", pred.shape)
+        # print("np.unique(pred_low.detach().cpu().numpy()) : ", np.unique(pred_low.detach().cpu().numpy()))
+        # print("np.unique(pred.detach().cpu().numpy()) : ", np.unique(pred.detach().cpu().numpy()))
+
         # prepare for torch model_zoo models images
 
 
@@ -137,11 +145,15 @@ class SCOPSTrainer(object):
         zoo_var = np.array([0.229, 0.224, 0.225]).reshape((1, 3, 1, 1))
         images_zoo_cpu = (images_cpu.numpy() +
                           IMG_MEAN.reshape((1, 3, 1, 1))) / 255.0
+
+        # print("images_cpu : " , images_cpu.shape)
+        # print("IMG_MEAN : " , IMG_MEAN.shape, IMG_MEAN.reshape((1, 3, 1, 1)).shape)
+        # print("images_zoo_cpu : ", images_zoo_cpu.shape, zoo_mean.shape)
         images_zoo_cpu -= zoo_mean
         images_zoo_cpu /= zoo_var
 
         images_zoo_cpu = torch.from_numpy(images_zoo_cpu)
-        # images_zoo = images_zoo_cpu.cuda(self.args.gpu)
+        # images_zoo_cpu = images_zoo_cpu.cuda(self.args.gpu)
         print("images_zoo_cpu : ", images_zoo_cpu.shape)
         with torch.no_grad():
 
@@ -166,7 +178,7 @@ class SCOPSTrainer(object):
 
         loss_sc = loss.semantic_consistency_loss(
             features=zoo_feat, pred=pred, basis=self.part_basis_generator())
-        loss_sc_value += self.args.lambda_sc * loss_sc.data.cpu().numpy()
+        loss_sc_value +=  loss_sc.data.cpu().numpy()
         print("loss_sc_value : ", loss_sc_value)
 
         # # orthonomal_loss
@@ -210,30 +222,26 @@ class SCOPSTrainer(object):
 
         # # visualization
 
-        # if current_step % self.args.vis_interval == 0:
-        #     with torch.no_grad():
-        #         pred_softmax = nn.Softmax(dim=1)(pred)
-        #         part_softmax = pred_softmax[:, 1:, :, :]
-        #         # normalize
-        #         part_softmax /= part_softmax.max(dim=3, keepdim=True)[
-        #             0].max(dim=2, keepdim=True)[0]
-        #         self.viz.vis_images(current_step, images_cpu, images_tps.cpu(
-        #         ), labels, edges, IMG_MEAN, pred.float())
-        #         self.viz.vis_part_heatmaps(
-        #             current_step, part_softmax, threshold=0.1, prefix='pred')
+        
 
-        #         if landmarks is not None:
-        #             self.viz.vis_landmarks(current_step, images_cpu,
-        #                                    IMG_MEAN, pred, landmarks)
-        #         if bbox is not None:
-        #             self.viz.vis_bboxes(current_step, bbox)
 
-        #         print('saving part basis')
-        #         torch.save({'W': self.part_basis_generator().detach().cpu(), 'W_state_dict': self.part_basis_generator.state_dict()},
-        #                    osp.join(self.args.snapshot_dir, self.args.exp_name, 'BASIS_' + str(current_step) + '.pth'))
+        if current_step % self.args.vis_interval == 0:
+            with torch.no_grad():
+                pred_softmax = nn.Softmax(dim=1)(pred)
+                part_softmax = pred_softmax[:, 1:, :, :]
+                # normalize
+                part_softmax /= part_softmax.max(dim=3, keepdim=True)[
+                    0].max(dim=2, keepdim=True)[0]
+                self.viz.vis_images("train", current_step, "original", images_cpu, IMG_MEAN)
+                self.viz.vis_image_pred("train", current_step, "predicted", images_cpu, pred.float(), IMG_MEAN)
+                
+                # self.viz.vis_part_heatmaps("train", current_step, images_cpu, part_softmax, "heatmap", 0.1)
 
-        #     self.viz.vis_losses(current_step, [self.part_basis_generator.w.mean(), self.part_basis_generator.w.std()], [
-        #         'part_basis_mean', 'part_basis_std'])
+                print('saving part basis')
+                torch.save({'W': self.part_basis_generator().detach().cpu(), 'W_state_dict': self.part_basis_generator.state_dict()},
+                           osp.join(self.args.snapshot_dir, self.args.exp_name, 'BASIS_' + str(current_step) + '.pth'))
+
+            
 
         # sum all loss terms
         # total_loss = self.args.lambda_con * loss_con \
@@ -242,9 +250,11 @@ class SCOPSTrainer(object):
         #     + self.args.lambda_sc * loss_sc \
         #     + self.args.lambda_orthonormal * loss_orthonamal
 
-        total_loss = self.args.lambda_sc * loss_sc
+        total_loss = loss_sc
 
         total_loss.backward()
+
+        # wandb.log({"epoch": current_step, "train loss": total_loss,  "lr": self.optimizer_sc.param_groups[0]['lr']})
 
         # # visualize loss curves
         # self.viz.vis_losses(current_step,
@@ -258,6 +268,8 @@ class SCOPSTrainer(object):
         nn.utils.clip_grad_norm_(
             self.part_basis_generator.parameters(), self.args.clip_gradients)
         self.optimizer_sc.step()
+
+
 
         # print('exp = {}'.format(osp.join(self.args.snapshot_dir, self.args.exp_name)))
         # print(('iter = {:8d}/{:8d}, ' +

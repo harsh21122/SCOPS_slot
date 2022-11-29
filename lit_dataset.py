@@ -14,8 +14,12 @@ IMG_MEAN = torch.from_numpy(np.array([104.00698793, 116.66876762, 122.67891434],
 class ToTensorDeepLabNormalized:
     def __call__(self, img):
         img = torch.from_numpy(np.array(img, np.int32, copy=False))
+        # print("In deep lab : ", img.shape)
         img = img.permute((2, 0, 1)).contiguous()
-        return img - IMG_MEAN
+        # print("In deep lab : ", img.shape)
+        # print("In deep lab : ", IMG_MEAN.shape)
+        img = img - IMG_MEAN
+        return img
 
 
 def to_tensor(img):

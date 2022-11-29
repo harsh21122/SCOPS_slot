@@ -134,7 +134,7 @@ class Classifier_Module(nn.Module):
         super(Classifier_Module, self).__init__()
         self.conv2d_list = nn.ModuleList()
         for dilation, padding in zip(dilation_series, padding_series):
-            self.conv2d_list.append(nn.Conv2d(2048, num_classes, kernel_size=3, stride=1, padding=padding, dilation=dilation, bias = True))
+            self.conv2d_list.append(nn.Conv2d(64, 1, kernel_size=3, stride=1, padding=padding, dilation=dilation, bias = True))
 
         for m in self.conv2d_list:
             m.weight.data.normal_(0, 0.01)
@@ -149,7 +149,7 @@ class Classifier_Module(nn.Module):
 
 class ResNet(nn.Module):
     def __init__(self, block, layers, num_classes):
-        resolution = (29, 29)
+        resolution = (17, 17)
         hid_dim = 64
         self.inplanes = 64
         super(ResNet, self).__init__()
@@ -178,7 +178,7 @@ class ResNet(nn.Module):
         self.relu = nn.ReLU()
         self.encoder_pos = SoftPositionEmbed(2048, resolution)
         self.decoder_pos = SoftPositionEmbed(hid_dim, (8, 8))
-        self.slot_attention = SlotAttention( num_slots= 5, dim = hid_dim,
+        self.slot_attention = SlotAttention( num_slots= num_classes , dim = hid_dim,
                                         iters = 3, eps = 1e-8,  hidden_dim = 128)
 
 
@@ -203,8 +203,8 @@ class ResNet(nn.Module):
         return block(dilation_series,padding_series,num_classes)
 
     
-    def forward(self, x):
-        x = self.conv1(x)
+    def forward(self, batch):
+        x = self.conv1(batch)
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
@@ -244,11 +244,15 @@ class ResNet(nn.Module):
 
         # currently trying to find the right input for decoder. Code works till here
         x5 = self.layer5(dec_feature)
+        print("x5: ", x5.shape)
+        masks = x5.reshape(batch.shape[0], -1, x5.shape[2], x5.shape[3])
+        print("masks : ", masks.shape)
+
 
         # To work the original scops code, use below line
         # x5 = self.layer5(x4)
 
-        return None, feature, x5
+        return None, feature, masks
 
     def get_1x_lr_params_NOscale(self):
         """

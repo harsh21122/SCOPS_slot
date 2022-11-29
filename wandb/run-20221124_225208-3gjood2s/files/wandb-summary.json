@@ -1,0 +1,1 @@
+{"train/original": {"_type": "image-file", "sha256": "99bba14543b44c876c0b818758e67996219236cbbbb7b576e156c00f33b221e7", "size": 284001, "path": "media/images/train/original_0_99bba14543b44c876c0b.png", "format": "png", "width": 906, "height": 228}, "_timestamp": 1669310575.030332, "_runtime": 46.548912048339844, "_step": 0, "_wandb": {"runtime": 33}}

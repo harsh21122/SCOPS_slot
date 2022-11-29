@@ -118,7 +118,7 @@ class PPDataset(Dataset):
         super().__init__()
 
         self.opts = opts
-        self.img_size = 224
+        self.img_size = 128
         self.split = "train"
         self.dataset_root =  opts.data_dir
         self.dataset = 'pascal-parts'

@@ -13,7 +13,7 @@ import sys
 from argparse import Namespace
 
 import numpy as np
-
+import wandb
 import cv2
 import scipy.misc
 import torch
@@ -21,7 +21,7 @@ import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils import data
-
+from visualizer import Visualizer
 import scops_trainer
 # from dataset.dataset_factory import dataset_generator
 from model.model_factory import model_generator
@@ -29,10 +29,12 @@ from lit_dataset import LitDataset
 
 
 
+
+
 # solve potential deadlock https://github.com/pytorch/pytorch/issues/1355
 cv2.setNumThreads(0)
 
-
+device = "cuda" if torch.cuda.is_available() else "cpu"
 EXP_NAME = 'SCOPS-Test'
 MODEL = 'DeepLab'
 BATCH_SIZE = 10
@@ -54,7 +56,7 @@ SAVE_PRED_EVERY = 5000
 SNAPSHOT_DIR = './snapshots/'
 WEIGHT_DECAY = 0.0005
 CLIP_GRAD_NORM = 5
-VIS_TNTERVAL = 100
+VIS_TNTERVAL = 1
 
 TPS_SIGMA = 0.01
 RAND_SCALE_LOW = 0.7
@@ -204,10 +206,13 @@ def get_arguments():
     return parser.parse_args()
 
 
+
+
 def main():
 
     args = get_arguments()
     args_dict = vars(args)
+
 
     if args.arg_file is not None:
         with open(args.arg_file, 'r') as f:
@@ -226,6 +231,10 @@ def main():
     with open(os.path.join(args.snapshot_dir, args.exp_name, 'exp_args.json'), 'w') as f:
         print(args_str, file=f)
 
+    wandb.login()
+    wandb.init(project="SCOPS_SLOT")
+    
+
     h, w = map(int, args.input_size.split(','))
     input_size = (h, w)
     args.input_size = input_size
@@ -237,6 +246,15 @@ def main():
     model = model_generator(args)
     print(model)
     model.train()
+    model.to(device)
+    named_parameters = []
+    for name, param in model.named_parameters():
+        print(name, param.requires_grad)
+        named_parameters.append(param)
+
+    # for param in partModel.parameters():
+    #     parameters.append(param)
+    print(len(named_parameters))
 
     # model.cuda(args.gpu)
     # cudnn.benchmark = True
@@ -256,14 +274,14 @@ def main():
     train_dataset = pascal_parts.PPDataset(args)
     trainloader = torch.utils.data.DataLoader(
         LitDataset(train_dataset),
-        batch_size=4,
+        batch_size=1,
         shuffle=True,
         drop_last=True)
     trainloader_iter = enumerate(trainloader)
     print(trainloader_iter)
 
     
-    for i_iter in range(1):
+    for i_iter in range(10000):
 
         try:
             _, batch = trainloader_iter.__next__()
@@ -274,7 +292,7 @@ def main():
         print(batch['img'].shape)
         
         trainer.step(batch, i_iter)
-        exit(0)
+        
         
 
         if i_iter >= args.num_steps - 1:

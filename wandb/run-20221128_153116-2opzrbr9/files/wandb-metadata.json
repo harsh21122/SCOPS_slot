@@ -1,0 +1,22 @@
+{
+    "os": "Linux-3.10.0-693.5.2.el7.x86_64-x86_64-with-glibc2.17",
+    "python": "3.9.13",
+    "heartbeatAt": "2022-11-28T10:01:22.351765",
+    "startedAt": "2022-11-28T10:01:16.286238",
+    "docker": null,
+    "cpu_count": 20,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "/ssd-scratch/harsh21122/ReferredPartSegmentation/SCOPS_slot/train.py",
+    "codePath": "train.py",
+    "git": {
+        "remote": "git@github.com:harsh21122/SCOPS_slot.git",
+        "commit": "a5d4c9d90a63d560445af342a454186e478d8db0"
+    },
+    "email": "harsh21122@iiitd.ac.in",
+    "root": "/ssd-scratch/harsh21122/ReferredPartSegmentation/SCOPS_slot",
+    "host": "hpc.iiitd.edu.in",
+    "username": "harsh21122",
+    "executable": "/home/harsh21122/.conda/envs/part/bin/python"
+}
