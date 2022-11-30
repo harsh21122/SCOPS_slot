@@ -40,8 +40,8 @@ Dataset - https://drive.google.com/file/d/1KmaqKL5-qjNIFM4UqwytRYkRQLLlZljN/view
 
 * Decoder
   * Decoder needs an input such as (batch, h, w, channels).
-  * For this we treat each slot as a batch and create a 1*1 window of 64 channels by reshaping the [1, 6, 64] to [1*6, 1, 1, 64]. 
-  * The 1*1 window is then repeated 8*8 times to create final decoder input : [6, 8, 8, 64].
+  * For this we treat each slot as a batch and create a (1, 1) window of 64 channels by reshaping the [1, 6, 64] to [1 \* 6, 1, 1, 64]. 
+  * The (1, 1)  window is then repeated (8, 8)  times to create final decoder input : [6, 8, 8, 64].
   * Decoder positional encoding is used of size (8,8).
   * Decoder positional encoding output is permuted to [6, 64, 8, 8]
   * After which we have used the decoder in SCOPS and not in the SLOT attention code.
@@ -59,11 +59,11 @@ Dataset - https://drive.google.com/file/d/1KmaqKL5-qjNIFM4UqwytRYkRQLLlZljN/view
 * Semantic loss:
   * Softmax of prediction is taken along dimension 1: [1, 6, 128, 128]
   * Remove the first channel assuming it to be background. New pred : [1, 5, 128, 128]
-  * Prediction is flatten : [1*128*128, 5]
-  * VGG prediction is flattened: [1*128*128, 512]
+  * Prediction is flatten : [1 \* 128 \* 128, 5]
+  * VGG prediction is flattened: [1 \* 128 \* 128, 512]
   * Prediction output is changed to 512 dim using part basis generator which has a Parameter of shape [5, 512].
-  * After which MSE loss is calculated between Prediction([1*128*128, 512]) and VGG features([1*128*128, 512]).
+  * After which MSE loss is calculated between Prediction([1 \* 128 \* 128, 512]) and VGG features([1 \* 128 \* 128, 512]).
 
-  
+
 
 
