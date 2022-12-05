@@ -37,11 +37,11 @@ cv2.setNumThreads(0)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 EXP_NAME = 'SCOPS-Test'
 MODEL = 'DeepLab'
-BATCH_SIZE = 10
+BATCH_SIZE = 6
 NUM_WORKERS = 4
 DATASET = 'PASCAL'
 DATA_DIRECTORY = '/home/harsh21122/tmp/PASCAL 2010'
-PASCAL_CLASS = 'horse'
+PASCAL_CLASS = 'cat'
 DATA_LIST_PATH = ''
 INPUT_SIZE = '128,128'
 LEARNING_RATE = 1e-5
@@ -56,7 +56,7 @@ SAVE_PRED_EVERY = 5000
 SNAPSHOT_DIR = './snapshots/'
 WEIGHT_DECAY = 0.0005
 CLIP_GRAD_NORM = 5
-VIS_TNTERVAL = 1
+VIS_TNTERVAL = 50
 
 TPS_SIGMA = 0.01
 RAND_SCALE_LOW = 0.7
@@ -178,7 +178,7 @@ def get_arguments():
                         help="default: vgg19")
     parser.add_argument("--ref-norm", action="store_true",
                         help="normalize reference feature map")
-    parser.add_argument("--lambda-orthonamal", type=float, default=1e2,
+    parser.add_argument("--lambda-orthonormal", type=float, default=1e2,
                         help="weighting parameter for DFF orthonormal loss")
 
     parser.add_argument("--detach-k", action="store_true",
@@ -274,7 +274,7 @@ def main():
     train_dataset = pascal_parts.PPDataset(args)
     trainloader = torch.utils.data.DataLoader(
         LitDataset(train_dataset),
-        batch_size=1,
+        batch_size=args.batch_size,
         shuffle=True,
         drop_last=True)
     trainloader_iter = enumerate(trainloader)

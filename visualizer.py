@@ -16,6 +16,8 @@ from skimage.transform import resize
 from PIL import Image
 import wandb
 import torchvision.utils as vutils
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
 def renormalize(x):
   """Renormalize from [-1, 1] to [0, 1]."""
   return x / 2. + 0.5
@@ -78,7 +80,7 @@ class Visualizer(object):
         print("Entering visual mode")
         # image = renormalize(images)
         i_shape = images.shape
-        mean_tensor = torch.tensor(mean).float().expand(i_shape[0], i_shape[3], i_shape[2], 3).transpose(1,3)
+        mean_tensor = torch.tensor(mean).float().expand(i_shape[0], i_shape[3], i_shape[2], 3).transpose(1,3).to(device)
         imgs_viz = torch.clamp(images+mean_tensor, 0.0, 255.0)
         imgs_viz = vutils.make_grid(imgs_viz, normalize=False, scale_each=False)
         print(imgs_viz.shape)
@@ -88,7 +90,7 @@ class Visualizer(object):
         print("Visualizing results")
         print("images.shape, pred.shape ", images.shape, pred.shape)
         i_shape = images.shape
-        mean_tensor = torch.tensor(mean).float().expand(i_shape[0], i_shape[3], i_shape[2], 3).transpose(1,3)
+        mean_tensor = torch.tensor(mean).float().expand(i_shape[0], i_shape[3], i_shape[2], 3).transpose(1,3).to(device)
         imgs_viz = torch.clamp(images+mean_tensor, 0.0, 255.0)
         pred = pred.detach().cpu().float().numpy()
         # print("np.unique(pred) :", np.unique(pred))
@@ -100,6 +102,7 @@ class Visualizer(object):
         # tps_imgs_viz = vutils.make_grid(images, normalize=False, scale_each=False)
         # print("tps_imgs_viz.shape, pred.shape ", tps_imgs_viz.shape, pred.shape)
         # pred = (tps_imgs_viz + pred)/2
+
         wandb.log({f'{setting}/{name}': wandb.Image(pred)}, step=i_iter)
         
 

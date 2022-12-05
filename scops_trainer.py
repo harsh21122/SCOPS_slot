@@ -13,7 +13,7 @@ import loss
 from utils import utils
 from model.feature_extraction import FeatureExtraction, featureL2Norm
 from torchvision import transforms
-# from tps.rand_tps import RandTPS
+from tps.rand_tps import RandTPS
 from visualizer import Visualizer
 import wandb
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -56,14 +56,14 @@ class SCOPSTrainer(object):
         self.model = model
 
         # Initialize spatial/color transform for Equuivariance loss.
-        # self.tps = RandTPS(args.input_size[1], args.input_size[0],
-        #                    batch_size=args.batch_size,
-        #                    sigma=args.tps_sigma,
-        #                    border_padding=args.eqv_border_padding,
-        #                    random_mirror=args.eqv_random_mirror,
-        #                    random_scale=(args.random_scale_low,
-        #                                  args.random_scale_high),
-        #                    mode=args.tps_mode).cuda(args.gpu)
+        self.tps = RandTPS(args.input_size[1], args.input_size[0],
+                           batch_size=args.batch_size,
+                           sigma=args.tps_sigma,
+                           border_padding=args.eqv_border_padding,
+                           random_mirror=args.eqv_random_mirror,
+                           random_scale=(args.random_scale_low,
+                                         args.random_scale_high),
+                           mode=args.tps_mode).cuda(args.gpu)
 
         # Color Transorm.
         self.cj_transform = transforms.Compose([
@@ -143,7 +143,7 @@ class SCOPSTrainer(object):
 
         zoo_mean = np.array([0.485, 0.456, 0.406]).reshape((1, 3, 1, 1))
         zoo_var = np.array([0.229, 0.224, 0.225]).reshape((1, 3, 1, 1))
-        images_zoo_cpu = (images_cpu.numpy() +
+        images_zoo_cpu = (images_cpu.cpu().numpy() +
                           IMG_MEAN.reshape((1, 3, 1, 1))) / 255.0
 
         # print("images_cpu : " , images_cpu.shape)
@@ -180,45 +180,48 @@ class SCOPSTrainer(object):
             features=zoo_feat, pred=pred, basis=self.part_basis_generator())
         loss_sc_value +=  loss_sc.data.cpu().numpy()
         print("loss_sc_value : ", loss_sc_value)
+        print("self.args", self.args)
+        # orthonomal_loss
+        loss_orthonamal = loss.orthonomal_loss(self.part_basis_generator())
+        loss_orthonamal_value += self.args.lambda_orthonormal * loss_orthonamal.data.cpu().numpy()
+        print("loss_orthonamal : ", loss_orthonamal.data.cpu().numpy())
 
-        # # orthonomal_loss
-        # loss_orthonamal = loss.orthonomal_loss(self.part_basis_generator())
-        # loss_orthonamal_value += self. args.lambda_orthonormal * \
-        #     loss_orthonamal.data.cpu().numpy()
-
-        # # Concentratin Loss
-        # loss_con = loss.concentration_loss(pred)
-        # loss_con_value += self.args.lambda_con * loss_con.data.cpu().numpy()
+        # Concentratin Loss
+        loss_con = loss.concentration_loss(pred)
+        loss_con_value += self.args.lambda_con * loss_con.data.cpu().numpy()
+        print("loss_con_value : ", loss_con.data.cpu().numpy())
 
         # # Equivariance Loss
-        # images_cj = torch.from_numpy(
-        #     ((images_cpu.numpy() + IMG_MEAN.reshape((1, 3, 1, 1))) / 255.0).clip(0, 1.0))
-        # for b in range(images_cj.shape[0]):
-        #     images_cj[b] = torch.from_numpy(self.cj_transform(
-        #         images_cj[b]).numpy() * 255.0 - IMG_MEAN.reshape((1, 3, 1, 1)))
-        # images_cj = images_cj.cuda()
+        images_cj = torch.from_numpy(
+            ((images_cpu.cpu().numpy() + IMG_MEAN.reshape((1, 3, 1, 1))) / 255.0).clip(0, 1.0))
+        for b in range(images_cj.shape[0]):
+            images_cj[b] = torch.from_numpy(self.cj_transform(
+                images_cj[b]).numpy() * 255.0 - IMG_MEAN.reshape((1, 3, 1, 1)))
+        images_cj = images_cj.cuda()
 
-        # self.tps.reset_control_points()
-        # images_tps = self.tps(images_cj)
-        # feature_instance_tps, feature_part_tps, pred_low_tps = self.model(
-        #     images_tps)
-        # pred_tps = self.interp(pred_low_tps)
-        # pred_d = pred.detach()
-        # pred_d.requires_grad = False
-        # # no padding in the prediction space
-        # pred_tps_org = self.tps(pred_d, padding_mode='zeros')
+        self.tps.reset_control_points()
+        images_tps = self.tps(images_cj)
+        feature_instance_tps, feature_part_tps, pred_low_tps = self.model(
+            images_tps)
+        pred_tps = self.interp(pred_low_tps)
+        pred_d = pred.detach()
+        pred_d.requires_grad = False
+        # no padding in the prediction space
+        pred_tps_org = self.tps(pred_d, padding_mode='zeros')
 
-        # loss_eqv = self.kl(F.log_softmax(pred_tps, dim=1),
-        #                    F.softmax(pred_tps_org, dim=1))
-        # loss_eqv_value += self.args.lambda_eqv * loss_eqv.data.cpu().numpy()
+        loss_eqv = self.kl(F.log_softmax(pred_tps, dim=1),
+                           F.softmax(pred_tps_org, dim=1))
+        loss_eqv_value += self.args.lambda_eqv * loss_eqv.data.cpu().numpy()
+        print("loss_eqv_value :", loss_eqv.data.cpu().numpy())
 
-        # centers_tps = utils.batch_get_centers(nn.Softmax(dim=1)(pred_tps)[:, 1:, :, :])
-        # pred_tps_org_dif = self.tps(pred, padding_mode='zeros')
-        # centers_tps_org = utils.batch_get_centers(nn.Softmax(
-        #     dim=1)(pred_tps_org_dif)[:, 1:, :, :])
+        centers_tps = utils.batch_get_centers(nn.Softmax(dim=1)(pred_tps)[:, 1:, :, :])
+        pred_tps_org_dif = self.tps(pred, padding_mode='zeros')
+        centers_tps_org = utils.batch_get_centers(nn.Softmax(
+            dim=1)(pred_tps_org_dif)[:, 1:, :, :])
 
-        # loss_lmeqv = F.mse_loss(centers_tps, centers_tps_org)
-        # loss_lmeqv_value += self.args.lambda_lmeqv * loss_lmeqv.data.cpu().numpy()
+        loss_lmeqv = F.mse_loss(centers_tps, centers_tps_org)
+        loss_lmeqv_value += self.args.lambda_lmeqv * loss_lmeqv.data.cpu().numpy()
+        print("loss_lmeqv_value :", loss_lmeqv.data.cpu().numpy())
 
         # # visualization
 
@@ -244,17 +247,17 @@ class SCOPSTrainer(object):
             
 
         # sum all loss terms
-        # total_loss = self.args.lambda_con * loss_con \
-        #     + self.args.lambda_eqv * loss_eqv \
-        #     + self.args.lambda_lmeqv * loss_lmeqv \
-        #     + self.args.lambda_sc * loss_sc \
-        #     + self.args.lambda_orthonormal * loss_orthonamal
+        total_loss = self.args.lambda_con * loss_con \
+            + self.args.lambda_eqv * loss_eqv \
+            + self.args.lambda_lmeqv * loss_lmeqv \
+            + self.args.lambda_sc * loss_sc \
+            + self.args.lambda_orthonormal * loss_orthonamal
 
-        total_loss = loss_sc
+       
 
         total_loss.backward()
 
-        # wandb.log({"epoch": current_step, "train loss": total_loss,  "lr": self.optimizer_sc.param_groups[0]['lr']})
+        wandb.log({"epoch": current_step, "train loss": total_loss,  "lr": self.optimizer_sc.param_groups[0]['lr']})
 
         # # visualize loss curves
         # self.viz.vis_losses(current_step,
@@ -271,16 +274,16 @@ class SCOPSTrainer(object):
 
 
 
-        # print('exp = {}'.format(osp.join(self.args.snapshot_dir, self.args.exp_name)))
-        # print(('iter = {:8d}/{:8d}, ' +
-        #        'loss_con = {:.3f}, ' +
-        #        'loss_eqv = {:.3f}, ' +
-        #        'loss_lmeqv = {:.3f}, ' +
-        #        'loss_sc = {:.3f}, ' +
-        #        'loss_orthonamal = {:.3f}')
-        #       .format(current_step, self.args.num_steps,
-        #               loss_con_value,
-        #               loss_eqv_value,
-        #               loss_lmeqv_value,
-        #               loss_sc_value,
-        #               loss_orthonamal_value))
+        print('exp = {}'.format(osp.join(self.args.snapshot_dir, self.args.exp_name)))
+        print(('iter = {:8d}/{:8d}, ' +
+               'loss_con = {:.3f}, ' +
+               'loss_eqv = {:.3f}, ' +
+               'loss_lmeqv = {:.3f}, ' +
+               'loss_sc = {:.3f}, ' +
+               'loss_orthonamal = {:.3f}')
+              .format(current_step, self.args.num_steps,
+                      loss_con_value,
+                      loss_eqv_value,
+                      loss_lmeqv_value,
+                      loss_sc_value,
+                      loss_orthonamal_value))

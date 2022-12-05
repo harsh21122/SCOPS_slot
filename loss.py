@@ -9,6 +9,8 @@ import torch.nn.functional as F
 from utils import utils
 from model.feature_extraction import featureL2Norm
 import numpy as np
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
 
 softmax = nn.Softmax(dim=1)
 
@@ -51,7 +53,7 @@ def semantic_consistency_loss(features, pred, basis):
     pred_softmax = nn.Softmax(dim=1)(pred)
     print("pred_softmax : ", pred_softmax.shape)
     part_softmax = pred_softmax[:, 1:, :, :]
-    print("part_softmax : ", part_softmax.shape, part_softmax.size(1), np.unique(part_softmax.detach().numpy()))
+    print("part_softmax : ", part_softmax.shape, part_softmax.size(1), np.unique(part_softmax.detach().cpu().numpy()))
     print("flat_part_softmax stage 1 : ",part_softmax.permute(0, 2, 3, 1).shape)
     
     flat_part_softmax = part_softmax.permute(
@@ -59,7 +61,7 @@ def semantic_consistency_loss(features, pred, basis):
     print("flat_part_softmax stage 2 : ",flat_part_softmax.shape)
 
     flat_features = features.permute(
-        0, 2, 3, 1).contiguous().view((-1, features.size(1)))
+        0, 2, 3, 1).contiguous().view((-1, features.size(1))).to(device)
     print("flat_features stage 1 : ", features.permute(0, 2, 3, 1).shape)
     print("flat_features stage 2 : ",features.size(1), flat_features.shape)
 
